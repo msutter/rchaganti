@@ -1,5 +1,36 @@
 try
 {
+    $here = Split-Path -Parent $MyInvocation.MyCommand.Path
+    Describe "Test DSC Resource execution" {
+
+        $TestDrive = 'TestDrive:'
+
+        # This requires Posh module 'https://github.com/msutter/Pester-Dsc.git'
+        $TestDsc = Get-DscTestEnvirement -TestDrive $TestDrive -ResourcePath $here
+
+        it "test if schema.mof is valid" {
+            mofcomp.exe -check $TestDsc.SchemaMofPath | should Be $True
+        }
+
+        it "test if module directory was created" {
+            Get-item $TestDsc.ModulesRootPath | Should Exist
+        }
+
+        it "test if module was copied" {
+            Get-item $TestDsc.ModulePath | Should Exist
+        }
+
+        it "test if mof was generated" {
+            Get-item $TestDsc.MofPath | Should Exist
+        }
+
+        it "test if generated mof is valid" {
+            (Get-item $TestDsc.MofPath) -and (mofcomp.exe -check  $TestDsc.MofPath) | should Be $True
+        }
+
+
+    }
+
     $prefix = [guid]::NewGuid().Guid -replace '[^a-z0-9]'
 
     Remove-Module [H]ostsFile
@@ -18,7 +49,7 @@ try
         It 'Returns a hashtable with Ensure set to Absent if the file does not contain the specified ip / hostname' {
             $ip       = '1.2.3.4'
             $hostname = 'test.com'
-            
+
             Setup -File hosts "    $ip SomeOtherHostname.com # $hostname Commented Out"
 
             $hashTable = & "Get-${prefix}TargetResource" -IPAddress $ip -HostName $hostname
@@ -33,7 +64,7 @@ try
         It 'Returns a hashtable with Ensure set to Absent if the file does not contain the specified ip / hostname' {
             $ip       = '1.2.3.4'
             $hostname = 'test.com'
-            
+
             Setup -File hosts "   $ip $hostname  # some comment"
 
             $hashTable = & "Get-${prefix}TargetResource" -IPAddress $ip -HostName $hostname
@@ -147,18 +178,18 @@ try
                 $ip          = '1.2.3.4'
                 $hostname    = 'test.com'
                 $secondLine  = '5.6.7.8 second.line.com'
-                
+
                 Set-Content TestDrive:\hosts "$ip", $secondLine
 
                 & "Set-${prefix}TargetResource" -IPAddress $ip -HostName $hostname -Ensure 'Present'
 
                 $parameterFilter = {
                     $Value.Count -eq 2 -and
-                    $Value[0] -eq "$ip $hostname" -and 
+                    $Value[0] -eq "$ip $hostname" -and
                     $Value[1] -eq $secondLine
                 }
 
-                Assert-MockCalled -ModuleName HostsFile -Scope It Set-Content -ParameterFilter $parameterFilter                
+                Assert-MockCalled -ModuleName HostsFile -Scope It Set-Content -ParameterFilter $parameterFilter
             }
 
             It 'Does not modify a file that already has the correct information' {
@@ -233,6 +264,7 @@ try
             }
         }
     }
+
 }
 finally
 {
